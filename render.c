@@ -95,3 +95,96 @@ void outer(void) {
         default: /* 3 */ acc += (k >> 1); break;
       }
       k--;
+    }
+
+    // do-while + goto
+    int z = x & 3;
+    do {
+      acc += z;
+      if (acc < 0) goto fix;
+    } while (--z >= 0);
+
+    return acc;
+
+fix:
+    acc = -acc + 3;
+    return acc;
+  }
+
+  int r1 = inner(10);
+  int r2 = inner(25);
+  if (((r1 ^ r2) & 1) == 0) puts("outer: even parity");
+  else                       puts("outer: odd parity");
+}
+
+/* ---------- 4) main: structs, function pointers, qsort with nested cmp ---------- */
+int main(void) {
+  // טיפוסים ומבנים
+  typedef void (*void_cb_t)(void);
+  struct Inner { void_cb_t cb; };
+  struct Outer { struct Inner in; } O = {0};
+
+  // Nested functions בתוך main (GNU C)
+  void deep(void) {
+    // לוגיקה קטנה עם לולאה ותנאי
+    int s = 0;
+    for (int i = 0; i < 6; i++) s += (i & 1) ? i : -i;
+    if (s == 0) puts("deep: balanced");
+    else        puts("deep: unbalanced");
+  }
+
+  void init(void) {
+    if (O.in.cb) O.in.cb();
+  }
+
+  // מצביעי פונקציות והצבות
+  void_cb_t fp = deep;
+  O.in.cb = deep;
+  init();      // מפעיל את ה-cb דרך struct
+  fp();        // מפעיל ישירות דרך מצביע
+
+  // מערך + qsort עם comparator פנימי מורכב
+  int data[] = { 7, -2, 7, 0, 5, 5, -9, 3, 12, -12, 1, 1, 2, 2, 100, -100 };
+  size_t n = sizeof(data)/sizeof(data[0]);
+
+  int cmp(const void* A, const void* B) {
+    const int a = *(const int*)A;
+    const int b = *(const int*)B;
+
+    // השתמש ב-compare “הכבד”
+    int c = compare(a, b);
+    if (c != 0) return c;
+
+    // שבירת שוויון: זוגיים “גדולים” מאזוגיים
+    bool ae = (a & 1) == 0, be = (b & 1) == 0;
+    if (ae != be) return ae ? 1 : -1;
+
+    // עוד שבירה: סכום ספרות
+    auto int digitsum(int v) {
+      if (v < 0) v = -v;
+      int s = 0;
+      while (v) { s += v % 10; v /= 10; }
+      return s;
+    }
+
+    int da = digitsum(a), db = digitsum(b);
+    return (da > db) - (da < db);
+  }
+
+  qsort(data, n, sizeof(int), cmp);
+
+  // שימוש ב-add עם זרימותיו
+  int total = 0;
+  for (size_t i = 0; i < n; i++) {
+    total = add(total, data[i]);
+    if ((i & 3) == 0) continue;
+    if ((total & 0x3F) == 0x2A) break;
+  }
+
+  // קריאה ל-outer (שמכיל inner)
+  outer();
+
+  // הדפסה מסכמת
+  printf("n=%zu, total=%d\n", n, total);
+  return 0;
+}
